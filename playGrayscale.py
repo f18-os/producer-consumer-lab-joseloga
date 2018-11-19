@@ -5,54 +5,30 @@ import random
 import queue
 import cv2
 import os
-
-
+import time
 
 # globals
 outputDir    = 'frames'
 clipFileName = 'clip.mp4'
-# initialize frame count    
-#count = 0
 vidcap = cv2.VideoCapture(clipFileName)
-success,image = vidcap.read()
-
-logging.basicConfig(level=logging.DEBUG,
-format='(%(threadName)-9s) %(message)s',)
-
 BUF_SIZE = 10
 q = queue.Queue(BUF_SIZE)
-
-def convertToGrayscale(inputFrame,outputDir,count):
-    if (inputFrame is not None):
-        print("Converting frame {}".format(count))
-        # convert the image to grayscale
-        grayscaleFrame = cv2.cvtColor(inputFrame, cv2.COLOR_BGR2GRAY)
+q2 = queue.Queue(BUF_SIZE)
 
 
-        outFileName = "{}/grayscale_{:04d}.jpg".format(outputDir, count)
-
-        # write output file
-        cv2.imwrite(outFileName, grayscaleFrame)
-        #delete inputfile
-        if os.path.exists(inFileName):
-            os.remove(inFileName    )
-
-        count += 1
-        inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
-        
-class ProducerThread(threading.Thread):
+class ExtractFrames(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
-        super(ProducerThread,self).__init__()
+        super(ExtractFrames,self).__init__()
         self.target = target
         self.name = name
 
     def run(self):
         count = 0
-        while True:
+        flag =True
+        while flag:
             if not q.full():
                 print("1")
-#              item = random.randint(1,10)
 
                 if not os.path.exists(outputDir):
                     print("Output directory {} didn't exist, creating".format(outputDir))
@@ -64,24 +40,26 @@ class ProducerThread(threading.Thread):
                     cv2.imwrite("{}/frame_{:04d}.jpg".format(outputDir, count), image)
                     print('Reading frame {}'.format(count))
                     count += 1
-#                    time.sleep(1000)
-        
-                
-#                logging.debug('Putting ' + str(item)  
-#                              + ' : ' + str(q.qsize()) + ' items in queue')
+                else:
+                    flag=False
+                    print ("Done exporting ---------------------------------------------------")
+                    
+
         return
 
-class ConsumerThread(threading.Thread):
+    
+class converttThread(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
-        super(ConsumerThread,self).__init__()
+        super(converttThread,self).__init__()
         self.target = target
         self.name = name
         return
 
     def run(self):
         count = 0
-        while True:
+        flag= True
+        while flag:
             if not q.empty():
                 print("2")
                 image = q.get()
@@ -92,12 +70,11 @@ class ConsumerThread(threading.Thread):
                     print("Converting frame {}".format(count))
                     # convert the image to grayscale
                     grayscaleFrame = cv2.cvtColor(inputFrame, cv2.COLOR_BGR2GRAY)
-
-
+                    
                     outFileName = "{}/grayscale_{:04d}.jpg".format(outputDir, count)
 
                     # write output file
-                    cv2.imwrite(outFileName, grayscaleFrame)
+                    q2.put(cv2.imwrite(outFileName, grayscaleFrame))
                     #delete inputfile
                     if os.path.exists(inFileName):
                         os.remove(inFileName)
@@ -105,19 +82,81 @@ class ConsumerThread(threading.Thread):
                     count += 1
 
                     inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
-
-                    # load the next frame
-                    inputFrame = cv2.imread(inFileName, cv2.IMREAD_COLOR)
-
-    #                time.sleep(random.random())
+                    success, jpgImage = cv2.imencode('.jpg', image)     
+                
         return
+    
+    
+    
+class PlayvideoThread(threading.Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs=None, verbose=None):
+        super(PlayvideoThread,self).__init__()
+        self.target = target
+        self.name = name
 
+    def run(self):
+            count = 0
+            outputDir    = 'frames'
+            frameDelay   = 42
+            flag=True
+            while flag:
+                if not q2.full():
+                    print("3")
+                    q2.get()
+                    startTime = time.time()
+
+                    # Generate the filename for the first frame 
+                    frameFileName = "{}/grayscale_{:04d}.jpg".format(outputDir, count)
+
+                    # load the frame
+                    frame = cv2.imread(frameFileName)
+                    if(frame is not None):  
+
+                        print("Displaying frame {}".format(count))
+                        # Display the frame in a window called "Video"
+                        cv2.imshow("Video", frame)
+
+                        # compute the amount of time that has elapsed
+                        # while the frame was processed
+                        elapsedTime = int((time.time() - startTime) * 1000)
+                        print("Time to process frame {} ms".format(elapsedTime))
+
+                        # determine the amount of time to wait, also
+                        # make sure we don't go into negative time
+                        timeToWait = max(1, frameDelay - elapsedTime)
+                        count+=1
+                        # Wait for 42 ms and check if the user wants to quit
+                        if cv2.waitKey(timeToWait) and 0xFF == ord("q"):
+                            break    
+
+                            # get the start time for processing the next frame
+                            startTime = time.time()
+
+                            # get the next frame filename
+                            count += 1
+                            frameFileName = "{}/grayscale_{:04d}.jpg".format(outputDir, count)
+
+                            # Read the next frame file
+                            frame = cv2.imread(frameFileName)
+
+                            # make sure we cleanup the windows, otherwise we might end up with a mess
+                            cv2.destroyAllWindows()
+                    else:
+                        flag=False
+                        print ("Done Displaying -------------------------------------------------")
+                           
+                   
+                            
+                    
+                    
 if __name__ == '__main__':
+    
+    f = ExtractFrames(name='extract')
+    c = converttThread(name='convert')
+    v = PlayvideoThread(name='video')
 
-    p = ProducerThread(name='producer')
-    c = ConsumerThread(name='consumer')
-
-p.start()
-time.sleep(1)
+f.start()
 c.start()
-time.sleep(1)   
+v.start()
+   
