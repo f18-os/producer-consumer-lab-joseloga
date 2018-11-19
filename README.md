@@ -9,23 +9,23 @@ and convert them to grayscale, and the third thread will display those
 frames. The threads will run concurrently.
 
 ## File List
-### ExtractFrames.py
-Extracts a series of frames from the video contained in 'clip.mp4' and saves 
-them as jpeg images in sequentially numbered files with the pattern
+
+### playGrayscale.py
+This file uses 3 threads to convert a video to grayscale.
+
+The first thread is incharge to extracts a series of frames from the video contained in 'clip.mp4'
+and saves them as jpeg images in sequentially numbered files with the pattern
 'frame_xxxx.jpg'.
 
-### ConvertToGrayscale.py
-Loads a series for frams from sequentially numbered files with the pattern
+The second thread loads a series for frames from sequentially numbered files with the pattern
 'frame_xxxx.jpg', converts the grames to grayscale, and saves them as jpeg
 images with the file names 'grayscale_xxxx.jpg'
 
-### DisplayFrames.py
-Loads a series of frames sequently from files with the names
+The third thread loads a series of frames sequently from files with the names
 'grayscale_xxxx.jpg' and displays them with a 42ms delay.
 
-### ExtractAndDisplay.py
-Loads a series of framss from a video contained in 'clip.mp4' and displays 
-them with a 42ms delay
+all threads running simultaneously.
+
 
 ## Requirements
 * Extract frames from a video file, convert them to grayscale, and display
@@ -43,6 +43,3 @@ them in sequence
   * Producer/consumer quesues will be bounded at ten frames
 
 Note: You may have ancillary objects and method in order to make you're code easer to understand and implement.
-
-
-
