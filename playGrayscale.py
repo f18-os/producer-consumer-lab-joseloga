@@ -1,4 +1,5 @@
 import threading
+from threading import Semaphore
 import time
 import logging
 import random
@@ -12,7 +13,8 @@ outputDir    = 'frames'
 clipFileName = 'clip.mp4'
 vidcap = cv2.VideoCapture(clipFileName)
 BUF_SIZE = 10
-
+sem=Semaphore(2)
+sem2=Semaphore(4)
 q = queue.Queue(BUF_SIZE)
 q2 = queue.Queue(BUF_SIZE)
 
@@ -104,11 +106,11 @@ class ExtractFrames(threading.Thread):
             os.makedirs(outputDir)
         while flag:
             if not q.full():
-                
+                sem.acquire()
                 success,image = vidcap.read()
                 flag=extractFrames(success,count,image)
                 count += 1
-                    
+                sem.release()
 
         return
 
@@ -126,7 +128,9 @@ class convertThread(threading.Thread):
         aux=""
         flag= True
         while flag:
-            if not q.empty():
+            if  q.full():
+                sem.acquire()
+                sem2.acquire()
                 image = q.get()
                 inFileName = "{}/frame_{:04d}.jpg".format(outputDir, count)
                 aux=inFileName
@@ -137,7 +141,9 @@ class convertThread(threading.Thread):
                 success, jpgImage = cv2.imencode('.jpg', image)
                 if(count in (0,738) ):
                     print("Done converting ---------------------------")
-                    flag=False    
+                    flag=False 
+                sem.release()
+                sem2.release()
                 
         return
     
@@ -157,13 +163,15 @@ class PlayvideoThread(threading.Thread):
             flag=True
             while flag:
                 if not q2.full():
+                    sem2.acquire()
+
                     playVideo(counts,frameDelay)
                     counts+=1
-                    print (counts," z")
+#                    print (counts," z")
                     if(counts in (0,738) ):
                         print("Done displaying ---------------------------")
                         flag=False
-                    
+                    sem2.release()    
                     
 if __name__ == '__main__':
     
